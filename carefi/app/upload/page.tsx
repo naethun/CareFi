@@ -65,7 +65,7 @@ export default function UploadPage() {
             <Button
               onClick={handleContinue}
               disabled={files.length !== 3}
-              className="w-full md:w-auto bg-stone-900 hover:bg-stone-800 gap-2"
+              className="w-full md:w-auto bg-stone-900 hover:bg-stone-800 text-white gap-2"
               size="lg"
             >
               Continue to analysis
