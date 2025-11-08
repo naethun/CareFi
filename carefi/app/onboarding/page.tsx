@@ -149,7 +149,7 @@ export default function OnboardingPage() {
               <div
                 key={index}
                 className={`flex-1 h-2.5 rounded-full ${
-                  index <= currentStep ? "bg-stone-900" : "bg-stone-200"
+                  index <= currentStep ? "bg-[#4d688a]" : "bg-stone-200"
                 } ${index < 4 ? "mr-2" : ""}`}
               />
             ))}
