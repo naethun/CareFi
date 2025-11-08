@@ -114,14 +114,13 @@ export default function Home() {
       {/* How It Works */}
       <section className="section-spacing bg-white">
         <div className="container-narrow">
-          <div className="mb-12">
-            <SectionHeading
-              eyebrow="Process"
-              title="How it works"
-              subtitle="Your personalized skin journey in five simple steps."
-              align="center"
-            />
-          </div>
+          <SectionHeading
+            eyebrow="Process"
+            title="How it works"
+            subtitle="Your personalized skin journey in five simple steps."
+            align="center"
+            className="mb-16"
+          />
 
           <div className="space-y-12">
             {[
@@ -167,7 +166,7 @@ export default function Home() {
                   <h3 className="text-xl font-display font-medium text-stone-900 mb-2">
                     {item.title}
                   </h3>
-                  <p className="text-sm text-stone-600 leading-relaxed">
+                  <p className="text-stone-600 leading-relaxed">
                     {item.description}
                   </p>
                 </div>
