@@ -43,14 +43,6 @@ export default function OnboardingPage() {
     budgetMax: "100",
   });
 
-  const steps = [
-    { id: "concerns", title: "Skin concerns" },
-    { id: "goals", title: "Your goals" },
-    { id: "routine", title: "Current routine" },
-    { id: "avoid", title: "Ingredients to avoid" },
-    { id: "budget", title: "Budget range" },
-  ];
-
   const toggleSelection = (field: "concerns" | "goals", value: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -61,7 +53,7 @@ export default function OnboardingPage() {
   };
 
   const handleNext = () => {
-    if (currentStep < steps.length - 1) {
+    if (currentStep < 4) {
       setCurrentStep((prev) => prev + 1);
     } else {
       router.push("/upload");
@@ -84,7 +76,7 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-stone-50 py-12">
       <div className="container-narrow">
         {/* Header */}
-        <div className="mb-12 text-center">
+        <div className="mb-9 text-center">
           <SectionHeading
             eyebrow="Step 1 of 3"
             title="Tell us about your skin"
@@ -96,29 +88,28 @@ export default function OnboardingPage() {
         {/* Progress bar */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-3">
-            {steps.map((step, index) => (
+            {[0, 1, 2, 3, 4].map((index) => (
               <div
-                key={step.id}
+                key={index}
                 className={`flex-1 h-2.5 rounded-full ${
                   index <= currentStep ? "bg-stone-900" : "bg-stone-200"
-                } ${index < steps.length - 1 ? "mr-2" : ""}`}
+                } ${index < 4 ? "mr-2" : ""}`}
               />
             ))}
           </div>
-          <p className="text-base font-medium text-stone-700 text-center">
-            {steps[currentStep].title}
-          </p>
         </div>
 
         {/* Form Card */}
         <Card className="p-8 md:p-12">
           {/* Step 0: Concerns */}
           {currentStep === 0 && (
-            <div className="space-y-6">
-              <h3 className="text-2xl font-display font-medium text-stone-900">
-                What are your main skin concerns?
-              </h3>
-              <p className="text-stone-600">Select all that apply</p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <h3 className="text-3xl font-display font-medium text-stone-900">
+                  What are your main skin concerns?
+                </h3>
+                <p className="text-stone-600">Select all that apply</p>
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {CONCERNS.map((concern) => (
                   <button
@@ -139,11 +130,13 @@ export default function OnboardingPage() {
 
           {/* Step 1: Goals */}
           {currentStep === 1 && (
-            <div className="space-y-6">
-              <h3 className="text-2xl font-display font-medium text-stone-900">
-                What do you want to improve?
-              </h3>
-              <p className="text-stone-600">Choose your top priorities</p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <h3 className="text-3xl font-display font-medium text-stone-900">
+                  What do you want to improve?
+                </h3>
+                <p className="text-stone-600">Choose your top priorities</p>
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {GOALS.map((goal) => (
                   <button
@@ -164,100 +157,112 @@ export default function OnboardingPage() {
 
           {/* Step 2: Current routine */}
           {currentStep === 2 && (
-            <div className="space-y-6">
-              <h3 className="text-2xl font-display font-medium text-stone-900">
-                Tell us about your current routine
-              </h3>
-              <p className="text-stone-600">
-                List the products you currently use (AM and PM)
-              </p>
-              <Textarea
-                placeholder="e.g., AM: CeraVe Cleanser, The Ordinary Niacinamide, EltaMD Sunscreen&#10;PM: Banila Co Oil Cleanser, CeraVe Cleanser, Paula's Choice BHA, CeraVe Moisturizer"
-                value={formData.currentRoutine}
-                onChange={(e) =>
-                  setFormData({ ...formData, currentRoutine: e.target.value })
-                }
-                className="min-h-[160px] resize-none"
-              />
-              <p className="text-xs text-stone-500">
-                Optional—but helps us understand what's working for you
-              </p>
-            </div>
-          )}
-
-          {/* Step 3: Avoid */}
-          {currentStep === 3 && (
-            <div className="space-y-6">
-              <h3 className="text-2xl font-display font-medium text-stone-900">
-                Any ingredients to avoid?
-              </h3>
-              <p className="text-stone-600">
-                List any known irritants or allergies
-              </p>
-              <Textarea
-                placeholder="e.g., fragrance, essential oils, denatured alcohol, retinol"
-                value={formData.irritants}
-                onChange={(e) =>
-                  setFormData({ ...formData, irritants: e.target.value })
-                }
-                className="min-h-[120px] resize-none"
-              />
-              <p className="text-xs text-stone-500">
-                We'll filter these out of your recommendations
-              </p>
-            </div>
-          )}
-
-          {/* Step 4: Budget */}
-          {currentStep === 4 && (
-            <div className="space-y-6">
-              <h3 className="text-2xl font-display font-medium text-stone-900">
-                What's your monthly budget?
-              </h3>
-              <p className="text-stone-600">
-                We'll optimize your routine to stay within range
-              </p>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-stone-700 mb-2">
-                      Minimum
-                    </label>
-                    <Input
-                      type="number"
-                      value={formData.budgetMin}
-                      onChange={(e) =>
-                        setFormData({ ...formData, budgetMin: e.target.value })
-                      }
-                      placeholder="20"
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-stone-700 mb-2">
-                      Maximum
-                    </label>
-                    <Input
-                      type="number"
-                      value={formData.budgetMax}
-                      onChange={(e) =>
-                        setFormData({ ...formData, budgetMax: e.target.value })
-                      }
-                      placeholder="100"
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-                <p className="text-sm text-stone-600">
-                  Current range: ${formData.budgetMin} - ${formData.budgetMax}{" "}
-                  per month
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <h3 className="text-3xl font-display font-medium text-stone-900">
+                  Tell us about your current routine
+                </h3>
+                <p className="text-stone-600">
+                  List the products you currently use (AM and PM)
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Textarea
+                  placeholder="e.g., AM: CeraVe Cleanser, The Ordinary Niacinamide, EltaMD Sunscreen&#10;PM: Banila Co Oil Cleanser, CeraVe Cleanser, Paula's Choice BHA, CeraVe Moisturizer"
+                  value={formData.currentRoutine}
+                  onChange={(e) =>
+                    setFormData({ ...formData, currentRoutine: e.target.value })
+                  }
+                  className="min-h-[160px] resize-none"
+                />
+                <p className="text-xs text-stone-500">
+                  Optional—but helps us understand what's working for you
                 </p>
               </div>
             </div>
           )}
 
+          {/* Step 3: Avoid */}
+          {currentStep === 3 && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <h3 className="text-3xl font-display font-medium text-stone-900">
+                  Any ingredients to avoid?
+                </h3>
+                <p className="text-stone-600">
+                  List any known irritants or allergies
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Textarea
+                  placeholder="e.g., fragrance, essential oils, denatured alcohol, retinol"
+                  value={formData.irritants}
+                  onChange={(e) =>
+                    setFormData({ ...formData, irritants: e.target.value })
+                  }
+                  className="min-h-[120px] resize-none"
+                />
+                <p className="text-xs text-stone-500">
+                  We'll filter these out of your recommendations
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: Budget */}
+          {currentStep === 4 && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <h3 className="text-3xl font-display font-medium text-stone-900">
+                  What's your monthly budget?
+                </h3>
+                <p className="text-stone-600">
+                  We'll optimize your routine to stay within range
+                </p>
+              </div>
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-stone-700 mb-2">
+                        Minimum
+                      </label>
+                      <Input
+                        type="number"
+                        value={formData.budgetMin}
+                        onChange={(e) =>
+                          setFormData({ ...formData, budgetMin: e.target.value })
+                        }
+                        placeholder="20"
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-stone-700 mb-2">
+                        Maximum
+                      </label>
+                      <Input
+                        type="number"
+                        value={formData.budgetMax}
+                        onChange={(e) =>
+                          setFormData({ ...formData, budgetMax: e.target.value })
+                        }
+                        placeholder="100"
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-sm text-stone-600">
+                    Current range: ${formData.budgetMin} - ${formData.budgetMax}{" "}
+                    per month
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Navigation */}
-          <div className="flex items-center justify-between mt-12 pt-6 border-t border-stone-200">
+          <div className="flex items-center justify-between mt-6 pt-6 border-t border-stone-200">
             <Button
               variant="ghost"
               onClick={handleBack}
@@ -272,7 +277,7 @@ export default function OnboardingPage() {
               disabled={!canProceed()}
               className="gap-2 bg-stone-900 hover:bg-stone-800"
             >
-              {currentStep === steps.length - 1 ? "Continue to upload" : "Next"}
+              {currentStep === 4 ? "Continue to upload" : "Next"}
               <ArrowRight className="w-4 h-4" />
             </Button>
           </div>
