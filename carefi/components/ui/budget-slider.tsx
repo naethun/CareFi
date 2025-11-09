@@ -137,12 +137,17 @@ export function BudgetSlider({
     }
 
     setMaxInputValue(value);
-    setMaxError(null);
 
     const numValue = parseFloat(value);
     
     // Validate range
     if (isNaN(numValue)) {
+      setMaxError(null);
+      return;
+    }
+
+    if (numValue > 100000000) {
+      setMaxError('Maximum value cannot exceed $100,000,000');
       return;
     }
 
@@ -160,6 +165,14 @@ export function BudgetSlider({
     if (isNaN(numValue) || maxInputValue === '') {
       setMaxInputValue(max.toString());
       setMaxError(null);
+      return;
+    }
+
+    // Validate and apply constraints
+    if (numValue > 100000000) {
+      setMaxError('Maximum value cannot exceed $100,000,000');
+      setMaxInputValue('100000000');
+      onChange(min, 100000000);
       return;
     }
 
