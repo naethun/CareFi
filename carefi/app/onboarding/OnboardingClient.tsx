@@ -48,6 +48,8 @@ export default function OnboardingClient({ user }: OnboardingClientProps) {
   });
   const [budgetMinError, setBudgetMinError] = useState<string>("");
   const [budgetMaxError, setBudgetMaxError] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string>("");
 
   const toggleSelection = (field: "concerns" | "goals", value: string) => {
     setFormData((prev) => ({
@@ -58,11 +60,66 @@ export default function OnboardingClient({ user }: OnboardingClientProps) {
     }));
   };
 
+  const handleSubmit = async () => {
+    // Validate form before submission
+    if (!canProceed()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError("");
+
+    try {
+      console.log("📤 [ONBOARDING] Submitting onboarding data...");
+
+      const response = await fetch("/api/onboarding", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          concerns: formData.concerns,
+          goals: formData.goals,
+          currentRoutine: formData.currentRoutine || null,
+          irritants: formData.irritants || null,
+          budgetMin: formData.budgetMin,
+          budgetMax: formData.budgetMax,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("❌ [ONBOARDING] Submission failed:", data);
+        const errorMessage =
+          data.error?.message ||
+          "Failed to save onboarding data. Please try again.";
+        setSubmitError(errorMessage);
+        setIsSubmitting(false);
+        return;
+      }
+
+      console.log("✅ [ONBOARDING] Onboarding data saved successfully:", data);
+      
+      // Redirect to upload page on success
+      router.push("/upload");
+    } catch (error) {
+      console.error("❌ [ONBOARDING] Submission error:", error);
+      setSubmitError(
+        "An unexpected error occurred. Please try again."
+      );
+      setIsSubmitting(false);
+    }
+  };
+
   const handleNext = () => {
     if (currentStep < 4) {
       setCurrentStep((prev) => prev + 1);
+      // Clear any previous errors when moving to next step
+      setSubmitError("");
     } else {
-      router.push("/upload");
+      // On last step, submit the form
+      handleSubmit();
     }
   };
 
@@ -351,13 +408,24 @@ export default function OnboardingClient({ user }: OnboardingClientProps) {
             )}
             <Button
               onClick={handleNext}
-              disabled={!canProceed()}
+              disabled={!canProceed() || isSubmitting}
               className="gap-2 bg-[#4d688a] hover:bg-slate-700 text-white"
             >
-              {currentStep === 4 ? "Continue to upload" : "Next"}
-              <ArrowRight className="w-4 h-4" />
+              {isSubmitting
+                ? "Saving..."
+                : currentStep === 4
+                ? "Continue to upload"
+                : "Next"}
+              {!isSubmitting && <ArrowRight className="w-4 h-4" />}
             </Button>
           </div>
+
+          {/* Error message */}
+          {submitError && (
+            <div className="mt-4 p-4 rounded-lg bg-red-50 border border-red-200">
+              <p className="text-sm text-red-800">{submitError}</p>
+            </div>
+          )}
         </Card>
 
         {/* Summary chips */}
