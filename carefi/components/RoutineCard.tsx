@@ -57,7 +57,7 @@ export function RoutineCard({
       </div>
 
       {/* Rationale accordion */}
-      <Accordion type="multiple" className="border-t border-stone-200">
+      <Accordion type="single" collapsible className="border-t border-stone-200">
         <AccordionItem value="rationale" className="border-none">
           <AccordionTrigger className="text-sm font-medium text-stone-700 hover:text-stone-900 py-3">
             Why this works
