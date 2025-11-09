@@ -53,14 +53,14 @@ export function BudgetProvider({
   // Ensure min is at least $1, but preserve the user's initial preference if it's higher
   const initialMinValue = Math.max(1, initialMin);
   const [min, setMin] = useState(initialMinValue);
-  // Ensure max is at least min, no upper limit
-  const [max, setMax] = useState(Math.max(initialMinValue, initialMax));
+  // Ensure max is at least min, but cannot exceed 100 million
+  const [max, setMax] = useState(Math.max(initialMinValue, Math.min(100000000, initialMax)));
 
   const setRange = (newMin: number, newMax: number) => {
     // Ensure min never goes below $1 and doesn't exceed max
     const validMin = Math.max(1, Math.min(newMin, newMax));
-    // Ensure max is at least min, no upper limit
-    const validMax = Math.max(validMin, newMax);
+    // Ensure max is at least min, but cannot exceed 100 million
+    const validMax = Math.max(validMin, Math.min(100000000, newMax));
     setMin(validMin);
     setMax(validMax);
   };
@@ -71,7 +71,7 @@ export function BudgetProvider({
         min,
         max,
         absoluteMin: 1, // Always allow minimum of $1
-        absoluteMax: Infinity, // Maximum has no limit
+        absoluteMax: 100000000, // Maximum cannot exceed $100,000,000
         setRange,
       }}
     >
