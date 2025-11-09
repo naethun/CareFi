@@ -165,6 +165,230 @@ function isRetryableError(error: unknown): boolean {
 }
 
 /**
+ * Build the system prompt for OpenAI product reranking
+ *
+ * Instructs the model to:
+ * - Select 8-12 products that best fit user's skin profile
+ * - Prioritize evidence-based actives matched to concerns
+ * - Exclude products with avoided ingredients
+ * - Ensure price is within budget
+ * - Diversify across routine steps (Cleanser, Treatment, Moisturizer, Sunscreen)
+ * - Return strict JSON matching schema
+ *
+ * @returns System prompt string
+ */
+export function buildRerankPrompt(): string {
+  return `You are a clinical, deterministic product reranker for skincare. Your job is to select and order products that best fit the user's detected skin traits, stated goals, allergies, and budget.
+
+RULES:
+- Prefer evidence-backed active ingredients matched to concerns.
+- Exclude any product containing avoided ingredients.
+- Ensure prices are within budget range.
+- Diversify across routine steps (at least: Cleanser, Treatment/Serum, Moisturizer, Sunscreen).
+- Select between 8-12 products total.
+- Return EXACTLY the JSON structure shown below, no extra keys, no prose.
+- Temperature = 0. Be consistent and repeatable.
+
+REQUIRED OUTPUT FORMAT (JSON only):
+{
+  "items": [
+    {
+      "product_id": "uuid-string-from-candidate-list",
+      "score": 0.95,
+      "reason": "Matches acne concerns with Salicylic Acid",
+      "step": "Cleanser",
+      "selected_vendor": "Amazon"
+    }
+  ],
+  "confidence": 85
+}
+
+FIELD REQUIREMENTS:
+- "items": Array of 8-12 ranked products (REQUIRED)
+  - "product_id": Must match an ID from candidate_products (REQUIRED, string)
+  - "score": Relevance score 0.0-1.0 (REQUIRED, number)
+  - "reason": Brief rationale under 20 words (REQUIRED, string)
+  - "step": Product category: "Cleanser", "Treatment", "Moisturizer", "Sunscreen", "Toner", "Serum", "Eye Cream", or "Mask" (REQUIRED, string)
+  - "selected_vendor": Merchant name from the product's merchants array (REQUIRED, string)
+- "confidence": Overall confidence score 0-100 (REQUIRED, number)
+
+Return ONLY valid JSON matching this exact structure. Do not include markdown, explanations, or any text outside the JSON object.`;
+}
+
+/**
+ * Schema for LLM rerank input (imported from recommendations schema)
+ */
+import type { LLMRankInput, LLMRankOutput } from '@/lib/recommendations/schema';
+import { LLMRankOutputSchema } from '@/lib/recommendations/schema';
+
+/**
+ * Error class for OpenAI reranking failures
+ */
+export class RerankError extends Error {
+  constructor(
+    message: string,
+    public readonly cause?: unknown,
+    public readonly retryable: boolean = false
+  ) {
+    super(message);
+    this.name = 'RerankError';
+  }
+}
+
+/**
+ * Call OpenAI to rerank products
+ *
+ * Sends compact product candidate list to OpenAI for intelligent reranking.
+ * Implements exponential backoff with jitter for rate limits and server errors.
+ * Validates response against LLMRankOutputSchema.
+ *
+ * @param input - Structured input with user profile, traits, and candidates
+ * @returns Validated LLM ranking output
+ * @throws RerankError on validation or API failures
+ */
+export async function rerankProducts(input: LLMRankInput): Promise<LLMRankOutput> {
+  let lastError: unknown;
+
+  // Retry loop (same config as vision)
+  for (let attempt = 0; attempt < RETRY_CONFIG.maxAttempts; attempt++) {
+    try {
+      // Add delay for retries
+      if (attempt > 0) {
+        const delay = getRetryDelay(attempt - 1);
+        console.log(`[OpenAI] Retry attempt ${attempt + 1}/${RETRY_CONFIG.maxAttempts} after ${delay}ms`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+
+      console.log(`[OpenAI] Calling rerank API (attempt ${attempt + 1}/${RETRY_CONFIG.maxAttempts})`);
+
+      // Limit candidate payload to avoid excessive tokens (keep top 25 for speed)
+      const limitedInput = {
+        ...input,
+        candidate_products: input.candidate_products.slice(0, 25),
+      };
+
+      // Build user message with compact JSON (no indentation to reduce size)
+      const userMessage = JSON.stringify(limitedInput);
+
+      console.log(`[OpenAI] Rerank payload size: ${userMessage.length} chars, ${limitedInput.candidate_products.length} candidates`);
+
+      // Call OpenAI Chat Completions API
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini', // Fast, cost-efficient model
+        messages: [
+          {
+            role: 'system',
+            content: buildRerankPrompt(),
+          },
+          {
+            role: 'user',
+            content: userMessage,
+          },
+        ],
+        max_tokens: 1500, // Reduced from 2000 for faster generation
+        temperature: 0, // Deterministic
+        response_format: { type: 'json_object' }, // Ensure JSON response
+      });
+
+      // Extract response content
+      const content_text = response.choices[0]?.message?.content;
+      if (!content_text) {
+        throw new RerankError('OpenAI returned empty response', undefined, true);
+      }
+
+      console.log(`[OpenAI] Received rerank response (${content_text.length} chars)`);
+
+      // Parse JSON
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(content_text);
+      } catch (parseError) {
+        console.error('[OpenAI] Failed to parse JSON. Raw response:', content_text.substring(0, 500));
+        throw new RerankError('OpenAI response is not valid JSON', parseError, false);
+      }
+
+      // Log parsed structure for debugging
+      console.log('[OpenAI] Parsed response structure:', {
+        hasItems: 'items' in (parsed as any),
+        itemsType: typeof (parsed as any).items,
+        itemsLength: Array.isArray((parsed as any).items) ? (parsed as any).items.length : 'not an array',
+        hasConfidence: 'confidence' in (parsed as any),
+        confidenceType: typeof (parsed as any).confidence,
+        topLevelKeys: Object.keys(parsed as any),
+      });
+
+      // Try to normalize response structure if OpenAI used different field names
+      let normalizedResponse = parsed as any;
+      
+      // Handle case where OpenAI might wrap in extra layer or use different names
+      if (!normalizedResponse.items && !normalizedResponse.confidence) {
+        // Check for common variations
+        if (normalizedResponse.recommendations && !normalizedResponse.items) {
+          normalizedResponse.items = normalizedResponse.recommendations;
+        }
+        if (normalizedResponse.ranked_products && !normalizedResponse.items) {
+          normalizedResponse.items = normalizedResponse.ranked_products;
+        }
+        if (normalizedResponse.products && !normalizedResponse.items) {
+          normalizedResponse.items = normalizedResponse.products;
+        }
+        if (normalizedResponse.overall_confidence && !normalizedResponse.confidence) {
+          normalizedResponse.confidence = normalizedResponse.overall_confidence;
+        }
+        if (normalizedResponse.confidence_score && !normalizedResponse.confidence) {
+          normalizedResponse.confidence = normalizedResponse.confidence_score;
+        }
+      }
+
+      // Validate against schema
+      const validationResult = LLMRankOutputSchema.safeParse(normalizedResponse);
+      if (!validationResult.success) {
+        console.error('[OpenAI] Rerank schema validation failed:', JSON.stringify(validationResult.error.errors, null, 2));
+        console.error('[OpenAI] Actual response received:', JSON.stringify(parsed, null, 2).substring(0, 1000));
+        throw new RerankError(
+          'OpenAI response does not match expected schema',
+          validationResult.error,
+          false
+        );
+      }
+
+      console.log(`[OpenAI] Rerank complete:`, {
+        itemCount: validationResult.data.items.length,
+        confidence: validationResult.data.confidence,
+      });
+
+      return validationResult.data;
+    } catch (error) {
+      lastError = error;
+
+      // Don't retry non-retryable errors
+      if (error instanceof RerankError && !error.retryable) {
+        throw error;
+      }
+
+      // Don't retry if this was the last attempt
+      if (attempt === RETRY_CONFIG.maxAttempts - 1) {
+        break;
+      }
+
+      // Check if we should retry
+      if (!isRetryableError(error)) {
+        throw error;
+      }
+
+      console.warn(`[OpenAI] Retryable error on attempt ${attempt + 1}:`, error);
+    }
+  }
+
+  // All retries exhausted
+  throw new RerankError(
+    `OpenAI rerank API failed after ${RETRY_CONFIG.maxAttempts} attempts`,
+    lastError,
+    false
+  );
+}
+
+/**
  * Call OpenAI Vision API with retry logic
  *
  * Sends three image URLs to OpenAI Vision for skin analysis.
